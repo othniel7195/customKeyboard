@@ -1,10 +1,3 @@
-//
-//  CTPCustomKeyboard.h
-//  CTPay
-//
-//  Created by zhao.feng on 2018/3/16.
-//  Copyright © 2018年 ctrip. All rights reserved.
-//
 
 #import <UIKit/UIKit.h>
 
