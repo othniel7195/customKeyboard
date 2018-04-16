@@ -5,6 +5,9 @@ typedef NS_OPTIONS(NSUInteger, CTPKBStype) {
     CTPKBStypeNumberPad = 1 << 0,
 };
 
+
+typedef void(^CTPCustomKeyboardDeleteBackward)(NSString * _Nullable text);
+
 @interface CTPCustomKeyboard : UIView
 
 
@@ -12,6 +15,8 @@ typedef NS_OPTIONS(NSUInteger, CTPKBStype) {
  输入源
  */
 @property (nonatomic, weak, nullable)id inputSource;
+@property (nonatomic, copy, nullable)CTPCustomKeyboardDeleteBackward deleteBackwardCallBack;
+
 /**
  键盘初始化
 
@@ -20,6 +25,6 @@ typedef NS_OPTIONS(NSUInteger, CTPKBStype) {
  */
 + (nonnull instancetype)ctp_keyboardWithStyle:(CTPKBStype)stype;
 
-- (CGFloat)ctp_keyboardHeight;
++ (CGFloat)ctp_keyboardHeight;
 
 @end
