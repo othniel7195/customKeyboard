@@ -2,8 +2,9 @@
 #import "CTPCustomKeyboard.h"
 #import "CTPCustomKeyboardButton.h"
 #import "StringUtil.h"
+#import "CTVectorImageView.h"
 
-static const CGFloat kCTPCustomKeyboardHeight = 216.0;
+static const CGFloat kCTPCustomKeyboardHeight = 200.0;
 
 @interface CTPCustomKeyboard()
 /**
@@ -18,14 +19,18 @@ static const CGFloat kCTPCustomKeyboardHeight = 216.0;
 
 + (nonnull instancetype)ctp_keyboardWithStyle:(CTPKBStype)stype
 {
-    return [[CTPCustomKeyboard alloc] initWithFrame:CGRectMake(0, 0, CTScreenWidth, kCTPCustomKeyboardHeight) withStype:stype];
+    CGFloat h = kCTPCustomKeyboardHeight;
+    if ([CTDevice isIphoneX]) {
+        h += 39.0;
+    }
+    return [[CTPCustomKeyboard alloc] initWithFrame:CGRectMake(0, 0, CTScreenWidth, h) withStype:stype];
 }
 
 - (instancetype)initWithFrame:(CGRect)frame withStype:(CTPKBStype)stype
 {
     self = [super initWithFrame:frame];
     if (!self) return nil;
-    
+    self.backgroundColor = CTColorHex(0xEFEFF4);
     _kbStype = stype;
     [self initKeyboardLayout];
     
@@ -42,6 +47,33 @@ static const CGFloat kCTPCustomKeyboardHeight = 216.0;
         default:
             break;
     }
+}
+
+- (void)setInputSource:(id)inputSource
+{
+    _inputSource = inputSource;
+    if (@available(iOS 9.0, *)) {
+        
+        if ([inputSource isKindOfClass:[UITextField class]]) {
+            UITextField *tmp = (UITextField *)inputSource;
+            UITextInputAssistantItem *item = tmp.inputAssistantItem;
+            item.leadingBarButtonGroups = @[];
+            item.trailingBarButtonGroups = @[];
+            
+        }else if ([inputSource isKindOfClass:[UITextView class]]){
+            UITextView *tmp = (UITextView *)inputSource;
+            UITextInputAssistantItem *item = tmp.inputAssistantItem;
+            item.leadingBarButtonGroups = @[];
+            item.trailingBarButtonGroups = @[];
+        }else if ([inputSource isKindOfClass:[UISearchBar class]]){
+            UISearchBar *tmp = (UISearchBar *)inputSource;
+            UITextInputAssistantItem *item = tmp.inputAssistantItem;
+            item.leadingBarButtonGroups = @[];
+            item.trailingBarButtonGroups = @[];
+        }
+        
+    }
+    
 }
 
 - (void)reloadNumberPad
@@ -62,6 +94,7 @@ static const CGFloat kCTPCustomKeyboardHeight = 216.0;
             numBtn.titleLabel.textAlignment = NSTextAlignmentCenter;
             numBtn.titleLabel.textColor = [UIColor whiteColor];
             numBtn.frame = frame;
+            numBtn.titleLabel.font = CTFontSysteSize(24);
             NSString *numberString = numberPads[row][col];
             numBtn.strTag = numberString;
             NSNumber *position = numberLinePositions[row][col];
@@ -72,35 +105,60 @@ static const CGFloat kCTPCustomKeyboardHeight = 216.0;
                 [numBtn setBackgroundColor:[UIColor whiteColor] forState:UIControlStateNormal];
                 [numBtn setBackgroundColor:[UIColor lightGrayColor] forState:UIControlStateHighlighted];
             }else if ([numberString isEqualToString:@"delete"]){
-                [numBtn setTitle:@"DEL" titleColor:[UIColor blackColor]];
+                CTVectorImageView *delImgView = [[CTVectorImageView alloc] initWithFrame:CGRectMake(0, 0, 34.0, 26) iconFontFamliyName:eCTIConFontFamilyName_pay imageCode:pay_icon_cancele62b_o_xe62b];
+                delImgView.imageColor = CTColorHex(0x333333);
+                UIImage *delImage = [delImgView toUIImage];
+                [numBtn setImage:delImage forState:UIControlStateNormal];
+                [numBtn setBackgroundColor:CTColorHex(0xEFEFF4) forState:UIControlStateNormal];
                 [numBtn setBackgroundColor:[UIColor lightGrayColor] forState:UIControlStateHighlighted];
             }
-            [numBtn addTarget:self action:@selector(inputNumberDone:) forControlEvents:UIControlEventTouchUpInside];
             [self addSubview:numBtn];
+            [numBtn addTarget:self action:@selector(inputNumberDone:) forControlEvents:UIControlEventTouchUpInside];
         }
         
     }
 }
-- (CGFloat)ctp_keyboardHeight
++ (CGFloat)ctp_keyboardHeight
 {
-    return kCTPCustomKeyboardHeight;
+    CGFloat h = kCTPCustomKeyboardHeight;
+    if ([CTDevice isIphoneX]) {
+        h += 39.0;
+    }
+    return h;
 }
+
 - (void)inputNumberDone:(CTPCustomKeyboardButton *)btn{
     CLog(@"点击键盘按钮：%@", btn.strTag);
+    if ([btn.strTag isEqualToString:@"blank"]) {
+        return;
+    }
     if ([btn.strTag isEqualToString:@"delete"]) {
         if (self.inputSource) {
             if ([self.inputSource isKindOfClass:[UITextField class]]) {
                 UITextField *tmp = (UITextField *)self.inputSource;
                 [tmp deleteBackward];
+                if(self.deleteBackwardCallBack){
+                    self.deleteBackwardCallBack(tmp.text);
+                }
+                
             }else if ([self.inputSource isKindOfClass:[UITextView class]]){
                 UITextView *tmp = (UITextView *)self.inputSource;
                 [tmp deleteBackward];
+                if(self.deleteBackwardCallBack){
+                    self.deleteBackwardCallBack(tmp.text);
+                }
             }else if ([self.inputSource isKindOfClass:[UISearchBar class]]){
                 UISearchBar *tmp = (UISearchBar *)self.inputSource;
-                NSMutableString *info = [NSMutableString stringWithString:tmp.text];
+                NSMutableString *info;
+                if (tmp.text) {
+                    info = [NSMutableString stringWithString:tmp.text];
+                }
                 if (info.length > 0) {
                     NSString *s = [info substringToIndex:info.length-1];
                     [tmp setText:s];
+                }
+                if(self.deleteBackwardCallBack){
+                    self.deleteBackwardCallBack(tmp.text);
                 }
             }
         }
@@ -111,7 +169,7 @@ static const CGFloat kCTPCustomKeyboardHeight = 216.0;
                 UITextField *tmp = (UITextField *)self.inputSource;
                 
                 if (tmp.delegate && [tmp.delegate respondsToSelector:@selector(textField:shouldChangeCharactersInRange:replacementString:)]) {
-                    NSRange range = NSMakeRange(tmp.text.length, 1);
+                    NSRange range = NSMakeRange(tmp.text.length, 0);
                     BOOL ret = [tmp.delegate textField:tmp shouldChangeCharactersInRange:range replacementString:title];
                     if (ret) {
                         [tmp insertText:title];
@@ -124,7 +182,7 @@ static const CGFloat kCTPCustomKeyboardHeight = 216.0;
                 UITextView *tmp = (UITextView *)self.inputSource;
                 
                 if (tmp.delegate && [tmp.delegate respondsToSelector:@selector(textView:shouldChangeTextInRange:replacementText:)]) {
-                    NSRange range = NSMakeRange(tmp.text.length, 1);
+                    NSRange range = NSMakeRange(tmp.text.length, 0);
                     BOOL ret = [tmp.delegate textView:tmp shouldChangeTextInRange:range replacementText:title];
                     if (ret) {
                         [tmp insertText:title];
@@ -135,11 +193,13 @@ static const CGFloat kCTPCustomKeyboardHeight = 216.0;
                 
             }else if ([self.inputSource isKindOfClass:[UISearchBar class]]){
                 UISearchBar *tmp = (UISearchBar *)self.inputSource;
-                NSMutableString *info = [NSMutableString stringWithString:tmp.text];
+                NSMutableString *info;
+                if (tmp.text) {
+                      info = [NSMutableString stringWithString:tmp.text];
+                }
                 [info appendString:title];
-                
                 if (tmp.delegate && [tmp.delegate respondsToSelector:@selector(searchBar:shouldChangeTextInRange:replacementText:)]) {
-                    NSRange range = NSMakeRange(tmp.text.length, 1);
+                    NSRange range = NSMakeRange(tmp.text.length, 0);
                     BOOL ret = [tmp.delegate searchBar:tmp shouldChangeTextInRange:range replacementText:title];
                     if (ret) {
                         [tmp setText:[info copy]];
